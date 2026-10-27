@@ -1225,9 +1225,16 @@ footer p { font-size:0.84rem; }
     <div class="card"><h3>Avoid loan sharks</h3><p>Interest can hit 30%+. Use the SRC hardship fund first, then registered lenders only.</p></div>
   </div>
 
-  <div class="fc-wrap">
-    <h4>💡 Financial Literacy Flashcards</h4>
-    <p class="fc-sub">Click the card to flip. 15 cards on budgeting, saving &amp; investing.</p>
+   <div class="fc-wrap">
+    <h4>💡 Campus Awareness Flashcards</h4>
+    <p class="fc-sub">Click the card to flip. Select a category below to test your knowledge.</p>
+    
+    <!-- NEW: Tabs for Flashcard Categories -->
+    <div class="tab-row" style="justify-content:center; margin-bottom: 1.5rem;">
+      <button class="tab active" onclick="switchFC('finance', this)">💰 Financial Literacy</button>
+      <button class="tab" onclick="switchFC('health', this)">🧠 Mental Health &amp; GBV</button>
+    </div>
+
     <div class="fc-scene" onclick="flipCard()">
       <div class="fc-inner" id="fcInner">
         <div class="fc-face fc-front"><div class="fc-q" id="fcQ">What does 'budget' mean?</div></div>
@@ -1238,9 +1245,8 @@ footer p { font-size:0.84rem; }
       <button class="fc-prev" onclick="fcPrev()">← Prev</button>
       <button class="fc-next" onclick="fcNext()">Next →</button>
     </div>
-    <div class="fc-count">Card <span id="fcN">1</span> of 15</div>
+    <div class="fc-count">Card <span id="fcN">1</span> of <span id="fcTotal">15</span></div>
   </div>
-</div>
 </section>
 
 <!-- DOCUMENTS -->
@@ -1334,7 +1340,7 @@ function postReview() {
 }
 
 // FLASHCARDS
-const FC = [
+const FC_Finance = [
   { q:"What does 'budget' mean?", a:"A budget is a plan for your money — deciding how much you'll spend on needs, wants and savings before spending a single thebe." },
   { q:"What is the 50/30/20 rule?", a:"50% of income → needs (food, rent, transport). 30% → wants (entertainment, eating out). 20% → savings. A simple framework to start managing money." },
   { q:"What's the difference between a need and a want?", a:"A NEED is essential to survive and study — food, transport, toiletries. A WANT is desirable but not urgent — takeaways, new clothes, streaming. Budget needs first." },
@@ -1351,11 +1357,70 @@ const FC = [
   { q:"What is lifestyle creep and why is it dangerous?", a:"Lifestyle creep is when income rises and spending rises equally — leaving the same nothing in savings. When your allowance increases, keep lifestyle costs flat and save the extra." },
   { q:"What is a unit trust and should a student invest in one?", a:"A pooled investment fund managed by professionals. In Botswana, BIFM and Stanbic offer them. As a student: save first, build 3 months of expenses saved, then explore low-risk unit trusts." }
 ];
-let fcI=0, fcFlipped=false;
-function renderFC(){ document.getElementById('fcQ').textContent=FC[fcI].q; document.getElementById('fcA').textContent=FC[fcI].a; document.getElementById('fcN').textContent=fcI+1; document.getElementById('fcInner').classList.remove('flipped'); fcFlipped=false; }
-function flipCard(){ fcFlipped=!fcFlipped; document.getElementById('fcInner').classList.toggle('flipped',fcFlipped); }
-function fcNext(){ fcI=(fcI+1)%FC.length; renderFC(); }
-function fcPrev(){ fcI=(fcI-1+FC.length)%FC.length; renderFC(); }
+
+const FC_Health = [
+  { q: "What is mental health?", a: "Mental health includes our emotional, psychological, and social well-being. It affects how we think, feel, and act, and determines how we handle stress, relate to others, and make choices." },
+  { q: "What should you do if you feel overwhelmed?", a: "You don't have to face it alone. Talk to a trusted friend, or book a free, confidential session with the campus counsellor (Ms Monna). Seeking help is a sign of strength, not weakness." },
+  { q: "What is GBV (Gender-Based Violence)?", a: "GBV is violence directed against a person because of their gender. It includes physical, sexual, emotional, and economic abuse. It is never the victim's fault and is a serious offense on campus." },
+  { q: "Where can you report GBV on campus?", a: "Report immediately to: 1. Campus Security. 2. The SRC Welfare Minister. 3. The Campus Health Clinic / Counsellor. 4. The BUAN Gender Focal Person. All reports are handled with strict confidentiality." },
+  { q: "How can you support a friend experiencing GBV?", a: "Listen without judgment, believe them, and reassure them it's not their fault. Don't pressure them to make immediate decisions, but gently guide them to campus authorities or the counsellor for professional help." },
+  { q: "What is burnout and how do you spot it?", a: "Burnout is chronic physical and emotional exhaustion caused by prolonged stress (like heavy academic loads). Signs include feeling drained, detached from your studies, and feeling like you're not achieving anything." },
+  { q: "How can students manage academic stress?", a: "Break tasks into small chunks, take regular breaks (Pomodoro technique), maintain a sleep schedule, exercise, and set realistic goals. Avoid pulling all-nighters before exams." },
+  { q: "What is a panic attack?", a: "A sudden episode of intense fear that triggers severe physical reactions when there is no real danger. Symptoms include rapid heart rate, sweating, and shortness of breath. It usually peaks in 10 minutes. Breathe deeply and focus on grounding yourself." },
+  { q: "Is counselling confidential?", a: "Yes. Campus counsellors are bound by professional ethics to keep your sessions private. Nothing you say will be shared with lecturers or your parents unless there is an immediate risk to life." },
+  { q: "How do you practice self-care as a student?", a: "Self-care isn't just spa days. It's getting 7 hours of sleep, eating proper meals, drinking water, setting boundaries with friends, and taking a 15-minute walk when you feel overwhelmed." },
+  { q: "What is a 'safe space'?", a: "A safe space is an environment (physical or virtual) where everyone feels secure, respected, and free to express themselves without fear of discrimination, harassment, or violence." },
+  { q: "What is consent?", a: "Consent is an enthusiastic, clear, and voluntary 'YES'. It must be given freely, informed, and can be withdrawn at any time. Silence or wearing certain clothes is NOT consent. Being under the influence means consent cannot be given." },
+  { q: "What is the SRC's role in student welfare?", a: "The SRC Welfare Minister advocates for student mental health, safety, and rights. They liaise with management to ensure hostels are safe and that victims of GBV or harassment get the support they need." },
+  { q: "How does sleep affect mental health?", a: "Lack of sleep impairs memory, concentration, and emotional regulation. It makes stress feel worse. Aim for 7-8 hours; it is the cheapest and most effective brain-booster for exams." },
+  { q: "What number to call in a mental health crisis?", a: "For immediate medical or safety emergencies, call Campus Security (+267 7777777) or Ambulance (997). For emotional crisis support, reach out to the Campus Counsellor or a trusted warden immediately." }
+];
+
+let currentFCDeck = 'finance';
+let fcI = 0, fcFlipped = false;
+
+function switchFC(deckName, btn) {
+  currentFCDeck = deckName;
+  fcI = 0;
+  
+  // Update active tab styling
+  document.querySelectorAll('.fc-wrap .tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  
+  // Update total count
+  const deck = currentFCDeck === 'finance' ? FC_Finance : FC_Health;
+  document.getElementById('fcTotal').textContent = deck.length;
+  
+  renderFC();
+}
+
+function renderFC() {
+  const deck = currentFCDeck === 'finance' ? FC_Finance : FC_Health;
+  document.getElementById('fcQ').textContent = deck[fcI].q;
+  document.getElementById('fcA').textContent = deck[fcI].a;
+  document.getElementById('fcN').textContent = fcI + 1;
+  document.getElementById('fcInner').classList.remove('flipped');
+  fcFlipped = false;
+}
+
+function flipCard() {
+  fcFlipped = !fcFlipped;
+  document.getElementById('fcInner').classList.toggle('flipped', fcFlipped);
+}
+
+function fcNext() {
+  const deck = currentFCDeck === 'finance' ? FC_Finance : FC_Health;
+  fcI = (fcI + 1) % deck.length;
+  renderFC();
+}
+
+function fcPrev() {
+  const deck = currentFCDeck === 'finance' ? FC_Finance : FC_Health;
+  fcI = (fcI - 1 + deck.length) % deck.length;
+  renderFC();
+}
+
+// Initialize on load
 renderFC();
 
 // DOWNLOADS

@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#e07030">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>BUAN Campus Map</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  /* Colours, font and shapes match the BUAN Information Hub */
+  :root{
+    --orange:#e07030;
+    --orange-light:#f5a04a;
+    --orange-pale:#fdf0e8;
+    --orange-tag-bg:#fde9d4;
+    --orange-tag-text:#c05a18;
+    --dark:#111827;
+    --mid:#6b7280;
+    --bg:#f9f5f2;
+    --white:#ffffff;
+    --border:#e5e7eb;
+    --radius:12px;
+    --blue:#2563eb;
+    --green:#16a34a;
+    --red:#b91c1c;
+  }
+  *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    font-family:'Inter',sans-serif;background:var(--bg);color:var(--dark);line-height:1.5;
+    display:flex;flex-direction:column;height:100vh;height:100dvh;padding-top:72px;overflow:hidden;
+  }
+  button{font-family:inherit;}
+
+  /* ── NAV (same pattern as the hub) ── */
+  nav{
+    position:fixed;top:0;left:0;right:0;z-index:2000;height:72px;
+    background:#fff;border-bottom:1px solid var(--border);
+    display:flex;align-items:center;justify-content:space-between;padding:0 1.5rem;gap:12px;
+  }
+  .nav-brand{display:flex;align-items:center;gap:12px;text-decoration:none;min-width:0;}
+  .nav-brand img{height:44px;}
+  .nav-brand-text{font-weight:700;font-size:1rem;color:var(--dark);white-space:nowrap;}
+  .nav-right{display:flex;align-items:center;gap:8px;}
+  .nav-back{font-size:0.84rem;font-weight:500;color:#374151;text-decoration:none;padding:6px 11px;border-radius:7px;transition:background 0.15s;white-space:nowrap;}
+  .nav-back:hover{background:#f3f4f6;}
+  .nav-back .short{display:none;}
+  .btn-primary{
+    background:var(--orange);color:#fff;font-weight:700;font-size:0.84rem;padding:10px 20px;
+    border-radius:40px;border:none;cursor:pointer;text-decoration:none;
+    display:inline-flex;align-items:center;gap:6px;transition:background 0.2s;white-space:nowrap;
+  }
+  .btn-primary:hover{background:#c55e22;}
+  .btn-primary.sm{padding:8px 16px;font-size:0.78rem;}
+
+  /* ── LAYOUT ── */
+  .layout{flex:1;min-height:0;display:flex;}
+  .sidebar{width:360px;flex-shrink:0;background:#fff;border-right:1px solid var(--border);overflow-y:auto;padding:1.1rem;}
+  .map-wrap{flex:1;position:relative;min-width:0;}
+  #map{position:absolute;inset:0;}
+
+  /* ── BROWSE PANEL ── */
+  .finput{
+    width:100%;padding:11px 14px;border:1px solid #d1d5db;border-radius:8px;
+    font-family:'Inter',sans-serif;font-size:0.88rem;color:var(--dark);outline:none;margin-bottom:0.9rem;background:#fff;
+    transition:border-color 0.2s;
+  }
+  .finput:focus{border-color:var(--orange);}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:1.1rem;}
+  .chip{
+    display:inline-flex;align-items:center;gap:6px;padding:6px 13px;border-radius:20px;
+    border:1px solid var(--border);background:#fff;font-size:0.74rem;font-weight:600;color:#374151;
+    cursor:pointer;transition:all 0.15s;
+  }
+  .chip:hover{border-color:#d1d5db;}
+  .chip.active{background:var(--orange);border-color:var(--orange);color:#fff;}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--orange);flex-shrink:0;}
+  .dot.academic{background:var(--orange);}
+  .dot.admin{background:var(--dark);}
+  .dot.residence{background:var(--orange-light);}
+  .dot.sports{background:var(--red);}
+  .dot.services{background:var(--mid);}
+  .chip.active .dot{box-shadow:0 0 0 2px rgba(255,255,255,0.7);}
+
+  .loc{
+    display:flex;align-items:stretch;background:#fff;border:1px solid var(--border);border-radius:var(--radius);
+    margin-bottom:0.6rem;transition:box-shadow 0.2s,border-color 0.2s;overflow:hidden;
+  }
+  .loc:hover{box-shadow:0 4px 16px rgba(0,0,0,0.07);border-color:#d1d5db;}
+  .loc-main{flex:1;min-width:0;text-align:left;background:none;border:none;padding:0.85rem 1rem;cursor:pointer;}
+  .loc-name{font-size:0.9rem;font-weight:700;color:var(--dark);}
+  .loc-meta{display:flex;align-items:center;gap:8px;margin-top:5px;font-size:0.78rem;color:var(--mid);}
+  .loc-dist{color:var(--orange-tag-text);font-weight:600;}
+  .loc-go{
+    border:none;border-left:1px solid var(--border);background:var(--orange-pale);color:var(--orange);
+    font-weight:700;font-size:0.78rem;padding:0 16px;cursor:pointer;transition:background 0.15s;
+  }
+  .loc-go:hover{background:var(--orange-tag-bg);}
+  .empty{font-size:0.85rem;color:var(--mid);padding:1rem 0.25rem;}
+
+  .tag{
+    display:inline-block;font-size:0.66rem;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;
+    color:var(--orange-tag-text);background:var(--orange-tag-bg);padding:3px 9px;border-radius:20px;
+  }
+
+  /* ── DIRECTIONS PANEL ── */
+  .back-btn{background:none;border:none;color:var(--orange);font-weight:700;font-size:0.84rem;cursor:pointer;padding:0;margin-bottom:0.9rem;}
+  .back-btn:hover{text-decoration:underline;}
+  .nav-dest h2{font-size:1.2rem;font-weight:800;letter-spacing:-0.3px;margin:6px 0 2px;}
+  .nav-dest p{font-size:0.82rem;color:var(--mid);}
+  .summary{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:1rem 0;}
+  .summary div{background:var(--bg);border-radius:var(--radius);padding:0.8rem 1rem;}
+  .summary strong{display:block;font-size:1.35rem;font-weight:800;letter-spacing:-0.5px;}
+  .summary span{font-size:0.7rem;color:var(--mid);font-weight:600;text-transform:uppercase;letter-spacing:0.6px;}
+  .next-step{
+    display:flex;align-items:center;gap:14px;background:var(--orange);color:#fff;
+    border-radius:var(--radius);padding:1rem 1.1rem;margin-bottom:0.9rem;
+  }
+  .next-step.arrived{background:var(--green);}
+  .ns-arrow{font-size:1.9rem;line-height:1;font-weight:700;width:38px;text-align:center;flex-shrink:0;}
+  .ns-dist{font-size:0.74rem;font-weight:600;opacity:0.85;text-transform:uppercase;letter-spacing:0.6px;}
+  .ns-text{font-size:1rem;font-weight:700;line-height:1.3;}
+  .notice{
+    background:var(--orange-pale);border:1px solid var(--orange-tag-bg);color:var(--orange-tag-text);
+    border-radius:10px;padding:0.7rem 0.9rem;font-size:0.8rem;margin-bottom:0.9rem;
+  }
+  .notice[hidden]{display:none;}
+  .steps{list-style:none;}
+  .steps li{display:flex;align-items:center;gap:12px;padding:0.6rem 0.6rem;border-radius:10px;font-size:0.86rem;}
+  .steps li.current{background:var(--orange-pale);}
+  .steps .arr{
+    width:30px;height:30px;border-radius:50%;background:var(--orange-pale);color:var(--orange);
+    display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;
+  }
+  .steps li.current .arr{background:var(--orange);color:#fff;}
+  .steps .txt{flex:1;font-weight:500;}
+  .steps .len{color:var(--mid);font-size:0.78rem;white-space:nowrap;}
+
+  /* ── MAP OVERLAYS ── */
+  .gps-chip{
+    position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:1000;max-width:calc(100% - 90px);
+    background:#fff;border:1px solid var(--border);border-radius:40px;padding:7px 14px;
+    font-size:0.78rem;font-weight:600;box-shadow:0 2px 10px rgba(0,0,0,0.12);
+    display:none;align-items:center;gap:10px;
+  }
+  .gps-chip.show{display:flex;}
+  .gps-chip .led{width:8px;height:8px;border-radius:50%;background:var(--mid);flex-shrink:0;}
+  .gps-chip.ok .led{background:var(--green);}
+  .gps-chip.err .led{background:var(--red);}
+  .gps-chip.wait .led{background:var(--orange);animation:blink 1s infinite;}
+  .gps-chip button{background:none;border:none;color:var(--orange);font-weight:700;font-size:0.78rem;cursor:pointer;}
+  @keyframes blink{50%{opacity:0.25;}}
+  .recenter{
+    position:absolute;right:12px;bottom:28px;z-index:1000;width:46px;height:46px;border-radius:50%;
+    background:#fff;border:1px solid var(--border);box-shadow:0 2px 10px rgba(0,0,0,0.18);
+    font-size:1.3rem;color:var(--orange);cursor:pointer;display:none;align-items:center;justify-content:center;
+  }
+
+  /* ── MAP MARKERS ── */
+  .pin{
+    width:28px;height:28px;border-radius:50% 50% 50% 0;background:var(--orange);
+    border:2px solid #fff;transform:rotate(-45deg);box-shadow:0 2px 6px rgba(0,0,0,0.35);
+  }
+  .pin.admin{background:var(--dark);}
+  .pin.residence{background:var(--orange-light);}
+  .pin.sports{background:var(--red);}
+  .pin.services{background:var(--mid);}
+  .user-pin{
+    width:18px;height:18px;border-radius:50%;background:var(--blue);border:3px solid #fff;
+    box-shadow:0 1px 4px rgba(0,0,0,0.4);animation:ring 2s infinite;
+  }
+  @keyframes ring{
+    0%{box-shadow:0 0 0 0 rgba(37,99,235,0.5);}
+    70%{box-shadow:0 0 0 16px rgba(37,99,235,0);}
+    100%{box-shadow:0 0 0 0 rgba(37,99,235,0);}
+  }
+  .leaflet-container{font-family:'Inter',sans-serif;}
+  .leaflet-popup-content-wrapper{border-radius:var(--radius);box-shadow:0 6px 24px rgba(0,0,0,0.16);}
+  .leaflet-popup-content{margin:14px 16px;}
+  .popup h3{font-size:0.98rem;font-weight:800;margin:6px 0 4px;}
+  .popup p{font-size:0.82rem;color:var(--mid);line-height:1.5;margin:0 0 6px;}
+  .popup .pd{font-size:0.8rem;font-weight:700;color:var(--orange-tag-text);margin-bottom:8px;}
+
+  /* ── SMALL SCREENS ── */
+  @media (max-width:800px){
+    nav{padding:0 1rem;}
+    .nav-back .long{display:none;}
+    .nav-back .short{display:inline;}
+    .layout{flex-direction:column;}
+    .map-wrap{order:1;flex:1 1 56%;}
+    .sidebar{order:2;width:100%;flex:1 1 44%;border-right:none;border-top:1px solid var(--border);padding:0.9rem;}
+  }
+  @media (max-width:420px){
+    .nav-brand-text{font-size:0.9rem;}
+    .btn-primary{padding:9px 14px;}
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <a class="nav-brand" href="index.html">
+    <img src="buan logo.webp" alt="BUAN" onerror="this.style.display='none'">
+    <span class="nav-brand-text">BUAN Campus Map</span>
+  </a>
+  <div class="nav-right">
+    <a class="nav-back" href="index.html"><span class="long">&larr; Information Hub</span><span class="short">&larr; Hub</span></a>
+    <button class="btn-primary" id="locateBtn" type="button">&#9678; My location</button>
+  </div>
+</nav>
+
+<div class="layout">
+  <aside class="sidebar" id="sidebar">
+
+    <div id="browsePanel">
+      <input type="text" class="finput" id="searchBox" placeholder="Search buildings..." autocomplete="off">
+      <div class="chips" id="chips">
+        <button type="button" class="chip active" data-cat="all">All</button>
+        <button type="button" class="chip" data-cat="academic"><i class="dot academic"></i>Academic</button>
+        <button type="button" class="chip" data-cat="admin"><i class="dot admin"></i>Admin</button>
+        <button type="button" class="chip" data-cat="residence"><i class="dot residence"></i>Residence</button>
+        <button type="button" class="chip" data-cat="sports"><i class="dot sports"></i>Sports</button>
+        <button type="button" class="chip" data-cat="services"><i class="dot services"></i>Services</button>
+      </div>
+      <div id="locList"></div>
+    </div>
+
+    <div id="navPanel" hidden>
+      <button type="button" class="back-btn" id="endNavBtn">&larr; Back to buildings</button>
+      <div class="nav-dest">
+        <span class="tag" id="navTag"></span>
+        <h2 id="navName"></h2>
+        <p id="navDesc"></p>
+      </div>
+      <div class="summary">
+        <div><strong id="navDist">&ndash;</strong><span>Remaining</span></div>
+        <div><strong id="navEta">&ndash;</strong><span>Walking</span></div>
+      </div>
+      <div class="next-step" id="nextStep"></div>
+      <div class="notice" id="navNotice" hidden></div>
+      <ol class="steps" id="stepList"></ol>
+    </div>
+
+  </aside>
+
+  <div class="map-wrap">
+    <div id="map"></div>
+    <div class="gps-chip" id="gpsChip"><span class="led"></span><span id="gpsText"></span><button type="button" id="gpsStop">Stop</button></div>
+    <button type="button" class="recenter" id="recenterBtn" aria-label="Centre the map on my location">&#9678;</button>
+  </div>
+</div>
+
+<script>
+  // =====================================================================
+  // SETTINGS
+  // =====================================================================
+  // The map is locked to the campus: visitors cannot pan or zoom out beyond it,
+  // and everything outside the boundary is greyed out.
+  // CAMPUS_CORNERS = [south-west corner, north-east corner] as [lat, lng].
+  // Edit these two points to match the campus boundary.
+  const CAMPUS_CORNERS = [[-24.5975, 25.9365], [-24.5880, 25.9465]];
+  // OPTIONAL: for an irregular campus shape, list the corner points of its outline
+  // in order, e.g. [[lat, lng], [lat, lng], [lat, lng], ...]. When this has 3 or
+  // more points it is used instead of the two corners above. Leave as [] to skip.
+  const CAMPUS_OUTLINE = [];
+
+  // Walking-route service (free, community-run OSRM server). Everything else
+  // on this page works without it: if it can't be reached the map falls back
+  // to a straight line with distance and time. For the official launch, point
+  // this at a self-hosted OSRM or a paid routing provider instead.
+  const ROUTING_URL = 'https://routing.openstreetmap.de/routed-foot/route/v1/driving/';
+
+  // BACKGROUND MAP PICTURES ("tiles")
+  // OpenStreetMap's free public servers block sites that rely on them (see their tile usage
+  // policy), so a live site should use a provider that issues a key. CARTO gives a free key by
+  // email for education / non-profit use: https://carto.com/basemaps/apikey/
+  // Paste your key between the quotes. If it is left empty the map falls back to OpenStreetMap's
+  // public servers, which may show "Access blocked" tiles.
+  const TILE_KEY = 'cb1_4snk_1_db2c16ecc994c9b777320bec';
+
+  // A location reported as less accurate than this (in metres) is treated as "rough": the page
+  // warns about it and does not centre the map on it. Typical phone GPS outdoors is 3-20 m;
+  // Wi-Fi positioning 20-150 m; mobile-network or internet-address positioning hundreds to thousands.
+  const ROUGH_ACCURACY = 150;
+
+  const WALK_SPEED = 1.4;      // metres per second, used when no route time is available
+  const ARRIVE_RADIUS = 20;    // metres from the building that counts as "arrived"
+  // true  = ask for the visitor's location as soon as the page opens, and open the map centred on them
+  //         (if they are on campus). If they decline, or are off campus, the map stays on the campus view.
+  // false = only start GPS when they tap "My location" or ask for directions.
+  const AUTO_LOCATE = true;
+
+  const FAR_FROM_CAMPUS = 3000; // metres: beyond this we warn the visitor they are off campus
+
+  // =====================================================================
+  // BUILDINGS  -  EDIT THIS LIST
+  // category must be one of: academic, admin, residence, sports, services
+  // Edit lat/lng to move a building; add or remove entries as needed.
+  // =====================================================================
+  const locations = [
+    { name: "Administration Block", category: "admin", lat: -24.5914, lng: 25.9415,
+      desc: "Main administrative offices, registrar, and student records." },
+    { name: "BUAN Library", category: "academic", lat: -24.5905, lng: 25.9405,
+      desc: "Main university library, western side of campus." },
+    { name: "Faculty of Food Science & Technology", category: "academic", lat: -24.5920, lng: 25.9428,
+      desc: "Home of the Food Science and Technology programmes." },
+    { name: "Student Hostels", category: "residence", lat: -24.5930, lng: 25.9440,
+      desc: "On-campus student residence halls." },
+    { name: "Sports Grounds", category: "sports", lat: -24.5900, lng: 25.9440,
+      desc: "Football field and general sports facilities." },
+    { name: "Main Cafeteria", category: "services", lat: -24.5918, lng: 25.9422,
+      desc: "Central dining hall serving staff and students." },
+    { name: "Teaching & Research Farm", category: "academic", lat: -24.5950, lng: 25.9390,
+      desc: "Working farm used for agricultural teaching and research." },
+    { name: "Health Clinic", category: "services", lat: -24.5908, lng: 25.9430,
+      desc: "On-campus medical and wellness services." }
+  ];
+
+  // <PURE>  helper functions with no page or map code (tested separately)
+  function toRad(d) { return d * Math.PI / 180; }
+
+  // Straight-line distance in metres between two GPS points
+  function haversine(lat1, lng1, lat2, lng2) {
+    const R = 6371000;
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  function formatDistance(m) {
+    if (m < 1000) return Math.round(m) + ' m';
+    return (m / 1000).toFixed(1) + ' km';
+  }
+
+  function formatDuration(sec) {
+    const min = Math.round(sec / 60);
+    if (min < 1) return '< 1 min';
+    if (min < 60) return min + ' min';
+    const h = Math.floor(min / 60);
+    const r = min % 60;
+    return h + ' h' + (r ? ' ' + r + ' min' : '');
+  }
+
+  function esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function compass(bearing) {
+    const names = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'];
+    return names[Math.round(bearing / 45) % 8];
+  }
+
+  const TURN_TEXT = {
+    'uturn': 'Make a U-turn',
+    'sharp right': 'Turn sharp right',
+    'right': 'Turn right',
+    'slight right': 'Bear right',
+    'straight': 'Continue straight',
+    'slight left': 'Bear left',
+    'left': 'Turn left',
+    'sharp left': 'Turn sharp left'
+  };
+
+  const TURN_ARROW = {
+    'uturn': '\u21BA',
+    'sharp right': '\u2198',
+    'right': '\u2192',
+    'slight right': '\u2197',
+    'straight': '\u2191',
+    'slight left': '\u2196',
+    'left': '\u2190',
+    'sharp left': '\u2199'
+  };
+
+  // Turns one routing step into a plain sentence
+  function stepText(step) {
+    const m = step.maneuver || {};
+    const road = step.name ? ' onto ' + step.name : '';
+    const base = TURN_TEXT[m.modifier];
+    if (m.type === 'depart') {
+      if (typeof m.bearing_after === 'number') {
+        return 'Head ' + compass(m.bearing_after) + (step.name ? ' on ' + step.name : '');
+      }
+      return 'Start walking' + (step.name ? ' on ' + step.name : '');
+    }
+    if (m.type === 'arrive') return 'Arrive at your destination';
+    if (m.type === 'roundabout' || m.type === 'rotary') {
+      return 'At the roundabout, take exit ' + (m.exit || 1) + road;
+    }
+    if (m.type === 'end of road') return (base || 'Turn') + ' at the end of the road' + road;
+    if (m.type === 'fork') {
+      const side = (m.modifier || '').indexOf('left') > -1 ? 'left' : (m.modifier || '').indexOf('right') > -1 ? 'right' : 'straight';
+      return 'Keep ' + side + ' at the fork' + road;
+    }
+    return (base || 'Continue') + road;
+  }
+
+  function stepArrow(step) {
+    const m = step.maneuver || {};
+    if (m.type === 'arrive') return '\u25CF';
+    if (m.type === 'depart') return '\u2191';
+    if (m.type === 'roundabout' || m.type === 'rotary') return '\u21BB';
+    return TURN_ARROW[m.modifier] || '\u2191';
+  }
+
+  // Closest point on a route (array of [lat, lng]) to a visitor; returns distance in metres
+  function nearestOnRoute(p, coords) {
+    const M = 111320;
+    const k = Math.cos(toRad(p.lat));
+    const px = p.lng * M * k, py = p.lat * M;
+    let best = { dist: Infinity, seg: 0, t: 0 };
+    for (let i = 0; i < coords.length - 1; i++) {
+      const ax = coords[i][1] * M * k, ay = coords[i][0] * M;
+      const bx = coords[i + 1][1] * M * k, by = coords[i + 1][0] * M;
+      const dx = bx - ax, dy = by - ay;
+      const len2 = dx * dx + dy * dy;
+      let t = len2 === 0 ? 0 : ((px - ax) * dx + (py - ay) * dy) / len2;
+      t = Math.max(0, Math.min(1, t));
+      const d = Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+      if (d < best.dist) best = { dist: d, seg: i, t: t };
+    }
+    return best;
+  }
+
+  // Metres of route still ahead of the visitor
+  function remainingDistance(p, coords) {
+    if (coords.length < 2) return 0;
+    const nr = nearestOnRoute(p, coords);
+    const a = coords[nr.seg], b = coords[nr.seg + 1];
+    let rem = haversine(a[0], a[1], b[0], b[1]) * (1 - nr.t);
+    for (let i = nr.seg + 1; i < coords.length - 1; i++) {
+      rem += haversine(coords[i][0], coords[i][1], coords[i + 1][0], coords[i + 1][1]);
+    }
+    return rem;
+  }
+
+  // Works out which upcoming instruction the visitor is heading for.
+  // steps[0] is the "depart" step, so the first real instruction is steps[1].
+  function advanceStep(user, steps, idx) {
+    if (steps.length < 2) return 0;
+    const last = steps.length - 1;
+    let i = Math.max(1, Math.min(idx, last));
+    while (i < last) {
+      const cur = steps[i].maneuver.location, nxt = steps[i + 1].maneuver.location;
+      const dCur = haversine(user.lat, user.lng, cur[1], cur[0]);
+      const dNxt = haversine(user.lat, user.lng, nxt[1], nxt[0]);
+      const between = haversine(cur[1], cur[0], nxt[1], nxt[0]);
+      if (dCur < 20 || dNxt < between * 0.5) i++; else break;
+    }
+    return i;
+  }
+  // </PURE>
+
+  // =====================================================================
+  // STATE
+  // =====================================================================
+  let userLocation = null;     // { lat, lng, accuracy } once GPS has a fix
+  let watchId = null;
+  let following = false;       // true when the map should keep the visitor centred
+  let activeCat = 'all';
+  let nav = null;              // directions in progress, or null
+  let pendingNavIdx = null;    // building chosen before GPS had a fix
+  let lastRefreshPos = null;
+  let userMoved = false;       // true once the visitor has moved or zoomed the map themselves
+  let settingView = false;     // true while the page itself is setting the default view
+  let userMarker = null;
+  let accuracyCircle = null;
+
+  // =====================================================================
+  // MAP
+  // =====================================================================
+  const campusOutline = CAMPUS_OUTLINE.length >= 3 ? CAMPUS_OUTLINE : [
+    [CAMPUS_CORNERS[0][0], CAMPUS_CORNERS[0][1]],
+    [CAMPUS_CORNERS[0][0], CAMPUS_CORNERS[1][1]],
+    [CAMPUS_CORNERS[1][0], CAMPUS_CORNERS[1][1]],
+    [CAMPUS_CORNERS[1][0], CAMPUS_CORNERS[0][1]]
+  ];
+  const campusBounds = L.latLngBounds(campusOutline);
+  const CAMPUS_CENTER = [campusBounds.getCenter().lat, campusBounds.getCenter().lng];
+
+  // Locked to the campus: no panning away, no zooming out past the whole campus
+  // zoomSnap 0.25 lets the campus fill the panel exactly instead of jumping to the next whole zoom level
+  const map = L.map('map', { maxBounds: campusBounds.pad(0.05), maxBoundsViscosity: 1.0, zoomSnap: 0.25 });
+
+  // Zoom at which the WHOLE campus is visible (the furthest out a visitor can zoom)
+  function containZoom() {
+    map.setMinZoom(0);
+    return map.getBoundsZoom(campusBounds);
+  }
+
+  // Default view: zoomed in just enough that the campus fills the whole panel, no grey margins.
+  // Visitors can still zoom out to see the entire campus.
+  function applyDefaultView() {
+    settingView = true;
+    map.invalidateSize();
+    const contain = containZoom();
+    const cover = map.getBoundsZoom(campusBounds, true);
+    map.setMinZoom(contain);
+    map.setView(campusBounds.getCenter(), Math.max(cover, contain), { animate: false });
+    settingView = false;
+  }
+  applyDefaultView();
+
+  // The panel can change size after the page loads (rotating the phone, the preview window
+  // settling, the on-screen keyboard). Re-fit the default view unless the visitor has
+  // already moved the map, and always keep the zoom limits correct.
+  let resizeTimer = null;
+  function onMapResized() {
+    if (!userMoved) { applyDefaultView(); return; }
+    settingView = true;
+    map.invalidateSize();
+    map.setMinZoom(containZoom());
+    settingView = false;
+  }
+  if (window.ResizeObserver) {
+    new ResizeObserver(() => { clearTimeout(resizeTimer); resizeTimer = setTimeout(onMapResized, 120); })
+      .observe(document.querySelector('.map-wrap'));
+  }
+
+  const tileKey = TILE_KEY.trim();
+  const TILE_SOURCE = tileKey ? {
+    url: 'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=' + encodeURIComponent(tileKey),
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, &copy; <a href="https://carto.com/attributions">CARTO</a>'
+  } : {
+    url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+  };
+  if (!tileKey) {
+    console.warn("No TILE_KEY set: using OpenStreetMap's public tile servers, which may block this site. See the background map settings at the top of the script.");
+  }
+
+  L.tileLayer(TILE_SOURCE.url, {
+    maxZoom: 19,
+    bounds: campusBounds.pad(0.3),     // don't download map tiles for areas outside the campus
+    referrerPolicy: 'strict-origin-when-cross-origin',   // sends the page address with tile requests, which providers require
+    attribution: TILE_SOURCE.attribution
+  }).addTo(map);
+
+  // Grey out everything outside the campus boundary (sits above the map, below pins and routes)
+  map.createPane('mask');
+  map.getPane('mask').style.zIndex = 350;
+  map.getPane('mask').style.pointerEvents = 'none';
+  L.polygon([[[-80, -360], [-80, 360], [80, 360], [80, -360]], campusOutline], {
+    pane: 'mask', stroke: false, fillColor: '#f9f5f2', fillOpacity: 1, interactive: false
+  }).addTo(map);
+  L.polygon(campusOutline, { color: '#e07030', weight: 2, dashArray: '6 6', fill: false, interactive: false }).addTo(map);
+
+  const routeGroup = L.layerGroup().addTo(map);
+
+  // Heads-up while editing: a building outside the boundary would be hidden
+  locations.forEach(l => {
+    if (!campusBounds.contains([l.lat, l.lng])) console.warn('"' + l.name + '" is outside the campus boundary, so it will not show.');
+  });
+
+  function makeIcon(category) {
+    return L.divIcon({ className: '', html: '<div class="pin ' + category + '"></div>', iconSize: [28, 28], iconAnchor: [14, 28] });
+  }
+
+  function popupHTML(i) {
+    const loc = locations[i];
+    let dist = '';
+    if (userLocation) {
+      dist = '<div class="pd">' + formatDistance(haversine(userLocation.lat, userLocation.lng, loc.lat, loc.lng)) + ' from you</div>';
+    }
+    return '<div class="popup"><span class="tag">' + esc(loc.category) + '</span>' +
+           '<h3>' + esc(loc.name) + '</h3><p>' + esc(loc.desc) + '</p>' + dist +
+           '<button type="button" class="btn-primary sm" onclick="startNavigation(' + i + ')">Walk here &rarr;</button></div>';
+  }
+
+  const markers = locations.map((loc, i) => {
+    const m = L.marker([loc.lat, loc.lng], { icon: makeIcon(loc.category) }).addTo(map);
+    m.bindPopup(popupHTML(i));
+    return m;
+  });
+
+  map.on('dragstart', () => { following = false; userMoved = true; });
+  map.on('zoomstart', () => { if (!settingView) userMoved = true; });
+
+  // =====================================================================
+  // BROWSE LIST
+  // =====================================================================
+  const locList = document.getElementById('locList');
+  const searchBox = document.getElementById('searchBox');
+
+  function renderList() {
+    const term = searchBox.value.trim().toLowerCase();
+    const rows = [];
+    locations.forEach((loc, i) => {
+      const show = (activeCat === 'all' || loc.category === activeCat) && loc.name.toLowerCase().indexOf(term) > -1;
+      if (show) {
+        markers[i].addTo(map);
+        const d = userLocation ? haversine(userLocation.lat, userLocation.lng, loc.lat, loc.lng) : null;
+        rows.push({ i: i, d: d });
+      } else {
+        markers[i].remove();
+      }
+    });
+    if (userLocation) rows.sort((a, b) => a.d - b.d);   // nearest first once GPS is on
+
+    if (!rows.length) {
+      locList.innerHTML = '<p class="empty">No buildings match your search.</p>';
+      return;
+    }
+    locList.innerHTML = rows.map(r => {
+      const loc = locations[r.i];
+      const dist = r.d !== null ? '<span class="loc-dist">' + formatDistance(r.d) + '</span>' : '';
+      return '<div class="loc">' +
+        '<button type="button" class="loc-main" data-i="' + r.i + '">' +
+          '<div class="loc-name">' + esc(loc.name) + '</div>' +
+          '<div class="loc-meta"><i class="dot ' + esc(loc.category) + '"></i><span>' + esc(loc.category) + '</span>' + dist + '</div>' +
+        '</button>' +
+        '<button type="button" class="loc-go" data-go="' + r.i + '" aria-label="Directions to ' + esc(loc.name) + '">Go &rarr;</button>' +
+      '</div>';
+    }).join('');
+  }
+
+  function focusLocation(i) {
+    map.setView([locations[i].lat, locations[i].lng], 18);
+    markers[i].openPopup();
+  }
+
+  locList.addEventListener('click', e => {
+    const go = e.target.closest('[data-go]');
+    if (go) { startNavigation(+go.dataset.go); return; }
+    const main = e.target.closest('.loc-main');
+    if (main) focusLocation(+main.dataset.i);
+  });
+
+  document.getElementById('chips').addEventListener('click', e => {
+    const chip = e.target.closest('.chip');
+    if (!chip) return;
+    document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    activeCat = chip.dataset.cat;
+    renderList();
+  });
+
+  searchBox.addEventListener('input', renderList);
+
+  function refreshPopups() {
+    markers.forEach((m, i) => m.setPopupContent(popupHTML(i)));
+  }
+
+  // =====================================================================
+  // GPS (device location)
+  // =====================================================================
+  const gpsChip = document.getElementById('gpsChip');
+  const gpsText = document.getElementById('gpsText');
+  const recenterBtn = document.getElementById('recenterBtn');
+
+  function setStatus(text, kind) {
+    if (!text) { gpsChip.className = 'gps-chip'; return; }
+    gpsChip.className = 'gps-chip show ' + (kind || '');
+    gpsText.textContent = text;
+  }
+
+  function startTracking() {
+    if (watchId !== null) return true;
+    if (!('geolocation' in navigator)) {
+      setStatus('This browser cannot access GPS', 'err');
+      return false;
+    }
+    if (window.isSecureContext === false) {
+      setStatus('Location needs a secure (https) page', 'err');
+      return false;
+    }
+    setStatus('Finding your location...', 'wait');
+    watchId = navigator.geolocation.watchPosition(onPosition, onGeoError, {
+      enableHighAccuracy: true, maximumAge: 2000, timeout: 20000
+    });
+    return true;
+  }
+
+  function stopTracking() {
+    if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+    watchId = null;
+    userLocation = null;
+    pendingNavIdx = null;
+    lastRefreshPos = null;
+    following = false;
+    if (userMarker) { userMarker.remove(); userMarker = null; }
+    if (accuracyCircle) { accuracyCircle.remove(); accuracyCircle = null; }
+    recenterBtn.style.display = 'none';
+    endNavigation();
+    setStatus('');
+    refreshPopups();
+    renderList();
+  }
+
+  function onGeoError(err) {
+    pendingNavIdx = null;
+    if (err.code === 1) {
+      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+      watchId = null;
+      setStatus('Location is blocked. Allow it for this site in your browser settings.', 'err');
+    } else if (err.code === 2) {
+      setStatus('Location unavailable. Check that GPS is switched on.', 'err');
+    } else {
+      setStatus('Still looking for a GPS signal... try moving outdoors.', 'wait');
+    }
+  }
+
+  function drawUser() {
+    const ll = [userLocation.lat, userLocation.lng];
+    if (!userMarker) {
+      userMarker = L.marker(ll, {
+        icon: L.divIcon({ className: '', html: '<div class="user-pin"></div>', iconSize: [18, 18], iconAnchor: [9, 9] }),
+        zIndexOffset: 1000
+      }).addTo(map);
+      accuracyCircle = L.circle(ll, { radius: userLocation.accuracy, color: '#2563eb', weight: 1, fillColor: '#2563eb', fillOpacity: 0.1 }).addTo(map);
+    } else {
+      userMarker.setLatLng(ll);
+      accuracyCircle.setLatLng(ll);
+      accuracyCircle.setRadius(userLocation.accuracy);
+    }
+  }
+
+  function onPosition(pos) {
+    const prev = userLocation;
+    const first = !prev;
+    const wasRough = !prev || prev.accuracy > ROUGH_ACCURACY;
+    userLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy || 0 };
+    const rough = userLocation.accuracy > ROUGH_ACCURACY;
+    const becameGood = wasRough && !rough;   // the first usable fix (a later, better fix counts too)
+    drawUser();
+    recenterBtn.style.display = 'flex';
+
+    const fromCampus = haversine(userLocation.lat, userLocation.lng, CAMPUS_CENTER[0], CAMPUS_CENTER[1]);
+    if (rough) {
+      setStatus('Rough location (within ' + formatDistance(userLocation.accuracy) + ') - go outside or use a phone for GPS', 'wait');
+    } else if (!campusBounds.contains([userLocation.lat, userLocation.lng])) {
+      setStatus('GPS on - you are outside the campus map (' + formatDistance(fromCampus) + ' away)', 'ok');
+    } else {
+      setStatus('GPS on - accurate to ' + Math.round(userLocation.accuracy) + ' m', 'ok');
+    }
+
+    // Refresh distances only when the visitor has moved a little, so open popups don't flicker
+    if (first || !lastRefreshPos || haversine(userLocation.lat, userLocation.lng, lastRefreshPos.lat, lastRefreshPos.lng) > 10) {
+      lastRefreshPos = { lat: userLocation.lat, lng: userLocation.lng };
+      refreshPopups();
+      renderList();
+    }
+
+    if (first && pendingNavIdx !== null) {
+      const i = pendingNavIdx;
+      pendingNavIdx = null;
+      startNavigation(i);
+    } else if (becameGood && !nav && campusBounds.contains([userLocation.lat, userLocation.lng])) {
+      centreOnUser();   // only once the location is accurate enough to trust
+    }
+
+    if (nav) updateNavigation();
+    if (nav && following) map.panTo([userLocation.lat, userLocation.lng]);
+  }
+
+  function centreOnUser() {
+    if (!userLocation) return;
+    following = true;
+    userMoved = true;   // this is a deliberate view now: a later resize must not snap back to the campus centre
+    map.setView([userLocation.lat, userLocation.lng], Math.max(map.getZoom(), 17));
+  }
+
+  document.getElementById('locateBtn').addEventListener('click', () => {
+    if (watchId === null) startTracking(); else centreOnUser();
+  });
+  recenterBtn.addEventListener('click', centreOnUser);
+  document.getElementById('gpsStop').addEventListener('click', stopTracking);
+
+  // =====================================================================
+  // WALKING DIRECTIONS (all shown on this page)
+  // =====================================================================
+  const browsePanel = document.getElementById('browsePanel');
+  const navPanel = document.getElementById('navPanel');
+  const nextStepEl = document.getElementById('nextStep');
+  const noticeEl = document.getElementById('navNotice');
+  const stepListEl = document.getElementById('stepList');
+
+  async function fetchRoute(from, to) {
+    const url = ROUTING_URL + from.lng + ',' + from.lat + ';' + to.lng + ',' + to.lat +
+                '?overview=full&geometries=geojson&steps=true';
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 9000);
+    try {
+      const res = await fetch(url, { signal: ctrl.signal });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      if (data.code !== 'Ok' || !data.routes || !data.routes.length) throw new Error(data.code || 'No route');
+      return data.routes[0];
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  function startNavigation(i) {
+    map.closePopup();
+    if (!userLocation) {
+      pendingNavIdx = i;
+      if (!startTracking()) pendingNavIdx = null;
+      return;
+    }
+    const loc = locations[i];
+    nav = { idx: i, route: null, stepIdx: 1, lastFetch: 0, fetching: false, fallback: false, fitted: false, arrived: false, notice: '' };
+
+    document.getElementById('navTag').textContent = loc.category;
+    document.getElementById('navName').textContent = loc.name;
+    document.getElementById('navDesc').textContent = loc.desc;
+    document.getElementById('navDist').textContent = '\u2013';
+    document.getElementById('navEta').textContent = '\u2013';
+    nextStepEl.className = 'next-step';
+    nextStepEl.innerHTML = '<div class="ns-arrow">\u2022</div><div><div class="ns-text">Finding the best walking route...</div></div>';
+    noticeEl.hidden = true;
+    stepListEl.innerHTML = '';
+    browsePanel.hidden = true;
+    navPanel.hidden = false;
+    document.getElementById('sidebar').scrollTop = 0;
+
+    const far = haversine(userLocation.lat, userLocation.lng, loc.lat, loc.lng);
+    if (far > FAR_FROM_CAMPUS) {
+      nav.notice = 'You are about ' + formatDistance(far) + ' away, so you are probably not on campus yet. These walking directions are meant for use once you arrive.';
+    }
+    showNotice(composeNotice());
+    loadRoute();
+  }
+
+  // Builds the notice shown above the steps from whatever currently applies
+  function composeNotice() {
+    const parts = [];
+    if (nav.notice) parts.push(nav.notice);
+    if (userLocation && userLocation.accuracy > ROUGH_ACCURACY) {
+      parts.push('Your location is only accurate to about ' + formatDistance(userLocation.accuracy) +
+                 ', so these directions may be off. For accurate directions, use a phone outdoors with GPS and precise location switched on.');
+    }
+    if (nav.fallback) {
+      parts.push('Turn-by-turn directions are not available right now. Follow the dashed orange line to the building.');
+    }
+    return parts.join(' ');
+  }
+
+  function showNotice(text) {
+    noticeEl.textContent = text;
+    noticeEl.hidden = !text;
+  }
+
+  async function loadRoute() {
+    const mine = nav;
+    if (!mine || mine.fetching || !userLocation) return;
+    mine.fetching = true;
+    mine.lastFetch = Date.now();
+    const target = locations[mine.idx];
+    try {
+      const r = await fetchRoute({ lat: userLocation.lat, lng: userLocation.lng }, target);
+      if (nav !== mine) return;
+      mine.route = {
+        coords: r.geometry.coordinates.map(c => [c[1], c[0]]),
+        steps: (r.legs && r.legs[0] && r.legs[0].steps) || [],
+        distance: r.distance,
+        duration: r.duration
+      };
+      mine.fallback = false;
+      mine.stepIdx = 1;
+      drawRoute();
+      renderSteps();
+    } catch (e) {
+      if (nav !== mine) return;
+      mine.route = null;
+      mine.fallback = true;
+      drawFallbackLine();
+      stepListEl.innerHTML = '';
+    } finally {
+      mine.fetching = false;
+      if (nav === mine) updateNavigation();
+    }
+  }
+
+  function drawRoute() {
+    routeGroup.clearLayers();
+    const pts = nav.route.coords;
+    const dest = locations[nav.idx];
+    const user = [userLocation.lat, userLocation.lng];
+    const dashed = { color: '#e07030', weight: 4, opacity: 0.9, dashArray: '2,9' };
+    L.polyline(pts, { color: '#ffffff', weight: 9, opacity: 0.95 }).addTo(routeGroup);
+    L.polyline(pts, { color: '#e07030', weight: 5, opacity: 1 }).addTo(routeGroup);
+    // If the route snaps to a road a little way from you or from the building, join the gap
+    if (haversine(user[0], user[1], pts[0][0], pts[0][1]) > 12) L.polyline([user, pts[0]], dashed).addTo(routeGroup);
+    const end = pts[pts.length - 1];
+    if (haversine(end[0], end[1], dest.lat, dest.lng) > 12) L.polyline([end, [dest.lat, dest.lng]], dashed).addTo(routeGroup);
+    if (!nav.fitted) {
+      nav.fitted = true;
+      following = false;
+      map.fitBounds(L.latLngBounds(pts.concat([user, [dest.lat, dest.lng]])), { padding: [50, 50] });
+    }
+  }
+
+  function drawFallbackLine() {
+    routeGroup.clearLayers();
+    const dest = locations[nav.idx];
+    const user = [userLocation.lat, userLocation.lng];
+    L.polyline([user, [dest.lat, dest.lng]], { color: '#e07030', weight: 4, opacity: 0.9, dashArray: '2,9' }).addTo(routeGroup);
+    if (!nav.fitted) {
+      nav.fitted = true;
+      following = false;
+      map.fitBounds(L.latLngBounds([user, [dest.lat, dest.lng]]), { padding: [50, 50] });
+    }
+  }
+
+  function renderSteps() {
+    const steps = nav.route.steps;
+    stepListEl.innerHTML = steps.map((s, i) => {
+      const len = s.maneuver && s.maneuver.type === 'arrive' ? '' : formatDistance(s.distance || 0);
+      return '<li data-s="' + i + '"><span class="arr">' + stepArrow(s) + '</span><span class="txt">' + esc(stepText(s)) + '</span><span class="len">' + len + '</span></li>';
+    }).join('');
+  }
+
+  function updateNavigation() {
+    if (!nav || !userLocation) return;
+    showNotice(composeNotice());
+    const dest = locations[nav.idx];
+    const straight = haversine(userLocation.lat, userLocation.lng, dest.lat, dest.lng);
+    const arriveAt = Math.max(ARRIVE_RADIUS, Math.min(userLocation.accuracy, 40));
+
+    if (straight <= arriveAt) {
+      nav.arrived = true;
+      document.getElementById('navDist').textContent = '0 m';
+      document.getElementById('navEta').textContent = '0 min';
+      nextStepEl.className = 'next-step arrived';
+      nextStepEl.innerHTML = '<div class="ns-arrow">\u2713</div><div><div class="ns-dist">You have arrived</div><div class="ns-text">' + esc(dest.name) + '</div></div>';
+      return;
+    }
+    nav.arrived = false;
+    nextStepEl.className = 'next-step';
+
+    let remaining, eta;
+    if (nav.route) {
+      remaining = remainingDistance(userLocation, nav.route.coords);
+      eta = nav.route.distance > 0 ? nav.route.duration * (remaining / nav.route.distance) : remaining / WALK_SPEED;
+
+      const steps = nav.route.steps;
+      nav.stepIdx = advanceStep(userLocation, steps, nav.stepIdx);
+      const st = steps[nav.stepIdx];
+      if (st) {
+        const loc = st.maneuver.location;
+        const d = haversine(userLocation.lat, userLocation.lng, loc[1], loc[0]);
+        const isEnd = st.maneuver.type === 'arrive';
+        nextStepEl.innerHTML = '<div class="ns-arrow">' + stepArrow(st) + '</div><div><div class="ns-dist">' +
+          (d < 25 ? 'Now' : 'In ' + formatDistance(d)) + '</div><div class="ns-text">' +
+          esc(isEnd ? 'Arrive at ' + dest.name : stepText(st)) + '</div></div>';
+      }
+      stepListEl.querySelectorAll('li').forEach(li => {
+        li.classList.toggle('current', +li.dataset.s === nav.stepIdx);
+      });
+
+      // Wandered off the route? Ask for a fresh one (at most every 12 seconds)
+      const off = nearestOnRoute(userLocation, nav.route.coords).dist;
+      if (off > Math.max(35, userLocation.accuracy * 1.5) && Date.now() - nav.lastFetch > 12000) loadRoute();
+    } else {
+      remaining = straight;
+      eta = straight / WALK_SPEED;
+      nextStepEl.innerHTML = '<div class="ns-arrow">\u2191</div><div><div class="ns-dist">' + formatDistance(straight) + ' to go</div><div class="ns-text">Head towards ' + esc(dest.name) + '</div></div>';
+      if (nav.fallback && Date.now() - nav.lastFetch > 30000) loadRoute();   // try the route service again
+    }
+    document.getElementById('navDist').textContent = formatDistance(remaining);
+    document.getElementById('navEta').textContent = formatDuration(eta);
+  }
+
+  function endNavigation() {
+    nav = null;
+    routeGroup.clearLayers();
+    navPanel.hidden = true;
+    browsePanel.hidden = false;
+  }
+  document.getElementById('endNavBtn').addEventListener('click', endNavigation);
+
+  // =====================================================================
+  // START
+  // =====================================================================
+  renderList();
+  if (AUTO_LOCATE) startTracking();
+</script>
+
+</body>
+</html>
